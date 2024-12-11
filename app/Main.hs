@@ -2,16 +2,16 @@
 
 module Main where
 
-import Turtle.Prelude (lstree, grepText, testfile, mkdir , cp)
-import Turtle (liftIO, extension, hasExtension, filename)
+import Turtle.Prelude (lstree, grepText, testfile, mkdir , cp, Size(..))
+import Turtle (liftIO, extension, hasExtension, filename, stat, fileSize, bytes, kilobytes, megabytes, gigabytes)
 import Turtle.Shell (sh, reduce)
 import Data.Set as Set 
 import Data.Text as Text 
 import qualified Data.Text.IO as Textio
 import qualified Control.Foldl as Foldl (list)
-import Control.Monad (void, sequence_, sequence)
+import Control.Monad (void, sequence_, sequence, liftM2)
 import qualified Data.Map.Strict as SM
-import System.IO (writeFile)
+import System.IO (writeFile, hFlush,stdout)
 import Data.Maybe (fromJust)
 import Data.List (partition, (\\))
 import Data.Char
@@ -76,6 +76,7 @@ main = do
         folders :: [Folder]
         folders = makeFolders files
     physicallyMakeFolders folders
+    printSizes folders
     pure ()
 
         
@@ -112,5 +113,41 @@ extension' file =
         Nothing   -> filepath
         (Just ex) -> ex
 ------------
+
+-- SIZE
+getFolderSizePart1 :: Int -> Folder -> IO [Size]
+getFolderSizePart1 counter folder = 
+    case folder of 
+        (Folder files) -> 
+            case counter >= (size files) of 
+             True  -> pure [] 
+             _     -> 
+                case elemAt counter files of 
+                        elem -> do 
+                            status <- stat (Text.unpack elem)
+                            liftM2 (:) (pure $ fileSize status) (getFolderSizePart1 counter (Folder (deleteAt counter files)))
+
+getFolderSizePart2 :: Integral n => Folder -> IO (SM.Map String n)
+getFolderSizePart2 folder = do 
+    fileSizes <- getFolderSizePart1 0 folder 
+    pure $ 
+       SM.fromList [("B", sum $ bytes <$> fileSizes)
+                   ,("KB" , sum $ kilobytes <$> fileSizes)
+                   ,("MB" , sum $ megabytes <$> fileSizes)
+                   ,("GB", sum $ gigabytes <$> fileSizes)
+                   ]
+
+printSize :: Folder -> IO () 
+printSize folder = do 
+    sizesMap <- getFolderSizePart2 folder 
+    (putStr "Bytes: ") >> (hFlush stdout) >> (print (sizesMap SM.! "B" ))
+    (putStr "Kilobytes: ") >> (hFlush stdout) >> (print (sizesMap SM.! "KB" ))
+    (putStr "Megabytes: ") >> (hFlush stdout) >> (print (sizesMap SM.! "MB" ))
+    (putStr "Gigabytes: ") >> (hFlush stdout) >> (print (sizesMap SM.! "GB" ))
+                         
+                 
+            
+printSizes :: [Folder] -> IO ()
+printSizes folders = sequence_ $ printSize <$> folders
 
     
