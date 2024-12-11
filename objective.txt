@@ -1,0 +1,4 @@
+Finds all files in a directory and its subdirectories. 
+sorts these files into folders based on their file extensions. 
+Calculates and prints the total size of all files for each type. 
+Optionally handle errors. 
